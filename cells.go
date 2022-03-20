@@ -61,7 +61,7 @@ func TotalRow(values ...string) *Row {
 	}
 }
 
-func paleYellow() color.Color {
+func PaleYellow() color.Color {
 	return &color.RGBA{
 		R: 255,
 		G: 255,
