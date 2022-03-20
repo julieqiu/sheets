@@ -29,7 +29,7 @@ func (r *Row) ToCells() []string {
 	return data
 }
 
-func totalRow(values ...string) *Row {
+func TotalRow(values ...string) *Row {
 	if len(values) < 1 {
 		panic("empty cells added to sheet")
 	}
