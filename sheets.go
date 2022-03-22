@@ -3,157 +3,15 @@ package sheets
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/sheets/v4"
 )
-
-func GoogleSheetsService(ctx context.Context, credentialsFile, tokenFile string) (*sheets.Service, error) {
-	// Read the user's credentials file.
-	b, err := ioutil.ReadFile(credentialsFile)
-	if err != nil {
-		return nil, err
-	}
-	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets")
-	if err != nil {
-		return nil, err
-	}
-	tok, err := getOauthToken(ctx, tokenFile, config)
-	if err != nil {
-		return nil, err
-	}
-	return sheets.New(config.Client(ctx, tok))
-}
-
-func getOauthToken(ctx context.Context, tokenFile string, config *oauth2.Config) (*oauth2.Token, error) {
-	// token.json stores the user's access and refresh tokens, and is created
-	// automatically when the authorization flow completes for the first time.
-	f, err := os.Open(tokenFile)
-	if err == nil {
-		defer f.Close()
-		tok := &oauth2.Token{}
-		if err := json.NewDecoder(f).Decode(tok); err != nil {
-			return nil, err
-		}
-		return tok, nil
-	}
-	if !os.IsNotExist(err) {
-		return nil, err
-	}
-	// If the token file isn't available, create one.
-	// Request a token from the web, then returns the retrieved token.
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	log.Printf("Go to the following link in your browser then type the "+
-		"authorization code: \n%v\n", authURL)
-
-	var authCode string
-	if _, err := fmt.Scan(&authCode); err != nil {
-		return nil, err
-	}
-	tok, err := config.Exchange(ctx, authCode)
-	if err != nil {
-		return nil, err
-	}
-	// Save the token for future use.
-	log.Printf("Saving credential file to: %s\n", tokenFile)
-	f, err = os.OpenFile(tokenFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	if err := json.NewEncoder(f).Encode(tok); err != nil {
-		return nil, err
-	}
-	return tok, nil
-}
-
-func Write(_ context.Context, outputDir string, data map[string][]*Row, rowData map[string][]*sheets.RowData) error {
-	// Write output to disk first.
-	var filenames []string
-	for filename, cells := range data {
-		if len(cells) == 0 {
-			continue
-		}
-		fullpath := filepath.Join(outputDir, fmt.Sprintf("%s.csv", filename))
-		file, err := os.Create(fullpath)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		writer := csv.NewWriter(file)
-		defer writer.Flush()
-
-		for _, row := range cells {
-			if err := writer.Write(row.ToCells()); err != nil {
-				return err
-			}
-		}
-		filenames = append(filenames, fullpath)
-	}
-	for _, filename := range filenames {
-		log.Printf("Wrote output to %s.\n", filename)
-	}
-	// Add a new sheet and write output to it.
-	for title, cells := range data {
-		if len(cells) == 0 {
-			continue
-		}
-		var rd []*sheets.RowData
-		for _, row := range cells {
-			var values []*sheets.CellData
-			for _, cell := range row.Cells {
-				cd := &sheets.CellData{
-					UserEnteredFormat: &sheets.CellFormat{
-						TextFormat: &sheets.TextFormat{
-							Bold: row.BoldText,
-						},
-					},
-				}
-				if row.Color != nil {
-					r, g, b, _ := row.Color.RGBA()
-					cd.UserEnteredFormat.BackgroundColor = &sheets.Color{
-						Blue:  float64(b) / 255.0,
-						Green: float64(g) / 255.0,
-						Red:   float64(r) / 255.0,
-					}
-				}
-				if cell.Hyperlink != "" {
-					cd.UserEnteredValue = &sheets.ExtendedValue{
-						FormulaValue: newStrPtr(cell.HyperlinkFormula()),
-					}
-				} else {
-					cd.UserEnteredValue = &sheets.ExtendedValue{
-						StringValue: newStrPtr(cell.Text),
-					}
-				}
-				values = append(values, cd)
-			}
-			rd = append(rd, &sheets.RowData{
-				Values: values,
-			})
-		}
-		rowData[title] = rd
-	}
-	return nil
-}
-
-func newStrPtr(text string) *string {
-	strValuePtr := new(string)
-	*strValuePtr = text
-	return strValuePtr
-}
 
 func CreateSheet(ctx context.Context, srv *sheets.Service, title string, rowData map[string][]*sheets.RowData) (*sheets.Spreadsheet, error) {
 	var newSheets []*sheets.Sheet
@@ -240,4 +98,82 @@ func GetSpreadsheetID(url string) (string, error) {
 		}
 	}
 	return spreadsheetID, nil
+}
+
+// Write populates the given rowData with the given data.
+func Write(_ context.Context, outputDir string, data map[string][]*Row, rowData map[string][]*sheets.RowData) error {
+	// Write output to disk first.
+	var filenames []string
+	for filename, cells := range data {
+		if len(cells) == 0 {
+			continue
+		}
+		fullpath := filepath.Join(outputDir, fmt.Sprintf("%s.csv", filename))
+		file, err := os.Create(fullpath)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		writer := csv.NewWriter(file)
+		defer writer.Flush()
+
+		for _, row := range cells {
+			if err := writer.Write(row.ToCells()); err != nil {
+				return err
+			}
+		}
+		filenames = append(filenames, fullpath)
+	}
+	for _, filename := range filenames {
+		log.Printf("Wrote output to %s.\n", filename)
+	}
+	// Add a new sheet and write output to it.
+	for title, cells := range data {
+		if len(cells) == 0 {
+			continue
+		}
+		var rd []*sheets.RowData
+		for _, row := range cells {
+			var values []*sheets.CellData
+			for _, cell := range row.Cells {
+				cd := &sheets.CellData{
+					UserEnteredFormat: &sheets.CellFormat{
+						TextFormat: &sheets.TextFormat{
+							Bold: row.BoldText,
+						},
+					},
+				}
+				if row.Color != nil {
+					r, g, b, _ := row.Color.RGBA()
+					cd.UserEnteredFormat.BackgroundColor = &sheets.Color{
+						Blue:  float64(b) / 255.0,
+						Green: float64(g) / 255.0,
+						Red:   float64(r) / 255.0,
+					}
+				}
+				if cell.Hyperlink != "" {
+					cd.UserEnteredValue = &sheets.ExtendedValue{
+						FormulaValue: newStrPtr(cell.HyperlinkFormula()),
+					}
+				} else {
+					cd.UserEnteredValue = &sheets.ExtendedValue{
+						StringValue: newStrPtr(cell.Text),
+					}
+				}
+				values = append(values, cd)
+			}
+			rd = append(rd, &sheets.RowData{
+				Values: values,
+			})
+		}
+		rowData[title] = rd
+	}
+	return nil
+}
+
+func newStrPtr(text string) *string {
+	strValuePtr := new(string)
+	*strValuePtr = text
+	return strValuePtr
 }
