@@ -78,6 +78,26 @@ func AppendToSheet(ctx context.Context, srv *sheets.Service, spreadsheetID strin
 	return response.UpdatedSpreadsheet, nil
 }
 
+func ResizeColumns(ctx context.Context, srv *sheets.Service, spreadsheet sheets.Spreadsheet) error {
+	// Final sheet updates:
+	// - Auto-resize the columns of the spreadsheet to fit.
+	var requests []*sheets.Request
+	for _, sheet := range spreadsheet.Sheets {
+		requests = append(requests, &sheets.Request{
+			AutoResizeDimensions: &sheets.AutoResizeDimensionsRequest{
+				Dimensions: &sheets.DimensionRange{
+					Dimension: "COLUMNS",
+					SheetId:   sheet.Properties.SheetId,
+				},
+			},
+		})
+	}
+	_, err := srv.Spreadsheets.BatchUpdate(spreadsheet.SpreadsheetId, &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: requests,
+	}).Context(ctx).Do()
+	return err
+}
+
 // Return the Google Sheets spreadsheet ID for the given URL. If the URL is an
 // invalid format, an error will be returned.
 func GetSpreadsheetID(url string) (string, error) {
