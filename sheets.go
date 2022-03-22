@@ -80,7 +80,7 @@ func AppendToSheet(ctx context.Context, srv *sheets.Service, spreadsheetID strin
 
 func ResizeColumns(ctx context.Context, srv *sheets.Service, spreadsheet sheets.Spreadsheet) error {
 	// Final sheet updates:
-	// - Auto-resize the columns of the spreadsheet to fit.
+	// - Auto-resize the  columns of the spreadsheet to fit.
 	var requests []*sheets.Request
 	for _, sheet := range spreadsheet.Sheets {
 		requests = append(requests, &sheets.Request{
