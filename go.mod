@@ -1,4 +1,4 @@
-module github.com/stamblerre/sheets
+module github.com/julieqiu/sheets
 
 go 1.18
 
