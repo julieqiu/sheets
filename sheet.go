@@ -2,14 +2,15 @@ package sheets
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/api/sheets/v4"
 )
 
 type GoogleSheet struct {
-	spreadsheetID string
-	spreadsheet   *sheets.Spreadsheet
-	service       *sheets.Service
+	id          string
+	spreadsheet *sheets.Spreadsheet
+	service     *sheets.Service
 }
 
 func New(ctx context.Context, credentialsFile, tokenFile, title string) (*GoogleSheet, error) {
@@ -23,13 +24,14 @@ func New(ctx context.Context, credentialsFile, tokenFile, title string) (*Google
 		return nil, err
 	}
 	return &GoogleSheet{
-		spreadsheetID: sheet.SpreadsheetId,
-		spreadsheet:   sheet,
-		service:       srv,
+		id:          sheet.SpreadsheetId,
+		spreadsheet: sheet,
+		service:     srv,
 	}, nil
 }
 
-func Open(ctx context.Context, credentialsFile, tokenFile, sheetsURL string) (*GoogleSheet, error) {
+func Open(ctx context.Context, credentialsFile, tokenFile, sheetsID string) (*GoogleSheet, error) {
+	sheetsURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit", sheetsID)
 	srv, err := GoogleSheetsService(ctx, credentialsFile, tokenFile)
 	if err != nil {
 		return nil, err
@@ -42,7 +44,6 @@ func Open(ctx context.Context, credentialsFile, tokenFile, sheetsURL string) (*G
 		spreadsheetID: spreadsheetID,
 		service:       srv,
 	}, nil
-
 }
 
 func createSheet(ctx context.Context, srv *sheets.Service, title string, rowData map[string][]*sheets.RowData) (*sheets.Spreadsheet, error) {

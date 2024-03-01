@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-
-	"google.golang.org/api/sheets/v4"
 )
 
 // GetSpreadsheetID returns the Google Sheets spreadsheet ID for the given URL.
@@ -31,14 +29,10 @@ func GetSpreadsheetID(url string) (string, error) {
 	return spreadsheetID, nil
 }
 
-func GetValues(ctx context.Context, srv *sheets.Service, spreadsheetId, readRange string) error {
-	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
+func (s *GoogleSheet) GetValues(ctx context.Context, readRange string) ([][]interface{}, error) {
+	resp, err := s.service.Spreadsheets.Values.Get(s.id, readRange).Do()
 	if err != nil {
-		return fmt.Errorf("unable to retrieve data from sheet: %v", err)
+		return nil, fmt.Errorf("unable to retrieve data from sheet: %v", err)
 	}
-	for _, row := range resp.Values {
-		// Print columns A and E, which correspond to indices 0 and 4.
-		fmt.Printf("%s, %s\n", row[0], row[4])
-	}
-	return nil
+	return resp.Values, nil
 }
