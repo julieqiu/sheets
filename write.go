@@ -11,7 +11,11 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-func (s *Spreadsheet) AppendToSheet(ctx context.Context, rowData map[string][]*sheets.RowData) error {
+func (s *Spreadsheet) AppendToSheet(ctx context.Context, data map[string][]*Row) error {
+	rowData, err := convertToRowData(data)
+	if err != nil {
+		return err
+	}
 	// First, create the new sheets in spreadsheet.
 	var createRequests []*sheets.Request
 	for title := range rowData {
@@ -75,18 +79,20 @@ func (s *Spreadsheet) ResizeColumns(ctx context.Context) error {
 	return err
 }
 
-// ConvertCells populates the given rowData with the given data.
-func ConvertCells(_ context.Context, outputDir string, data map[string][]*Row, rowData map[string][]*sheets.RowData) error {
+// convertToRowData returns a rowData with the given data.
+func convertToRowData(data map[string][]*Row) (map[string][]*sheets.RowData, error) {
+	rowData := map[string][]*sheets.RowData{}
+
 	// Write output to disk first.
 	var filenames []string
 	for filename, cells := range data {
 		if len(cells) == 0 {
 			continue
 		}
-		fullpath := filepath.Join(outputDir, fmt.Sprintf("%s.csv", filename))
+		fullpath := filepath.Join("/tmp", fmt.Sprintf("julieqiusheets-%s.csv", filename))
 		file, err := os.Create(fullpath)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer file.Close()
 
@@ -95,7 +101,7 @@ func ConvertCells(_ context.Context, outputDir string, data map[string][]*Row, r
 
 		for _, row := range cells {
 			if err := writer.Write(row.ToCells()); err != nil {
-				return err
+				return nil, err
 			}
 		}
 		filenames = append(filenames, fullpath)
@@ -144,7 +150,7 @@ func ConvertCells(_ context.Context, outputDir string, data map[string][]*Row, r
 		}
 		rowData[title] = rd
 	}
-	return nil
+	return rowData, nil
 }
 
 func newStrPtr(text string) *string {
