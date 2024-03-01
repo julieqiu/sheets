@@ -11,7 +11,7 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-func (s *GoogleSheet) AppendToSheet(ctx context.Context, rowData map[string][]*sheets.RowData) error {
+func (s *Spreadsheet) AppendToSheet(ctx context.Context, rowData map[string][]*sheets.RowData) error {
 	// First, create the new sheets in spreadsheet.
 	var createRequests []*sheets.Request
 	for title := range rowData {
@@ -55,7 +55,7 @@ func (s *GoogleSheet) AppendToSheet(ctx context.Context, rowData map[string][]*s
 	return nil
 }
 
-func (s *GoogleSheet) ResizeColumns(ctx context.Context) error {
+func (s *Spreadsheet) ResizeColumns(ctx context.Context) error {
 	// Final sheet updates:
 	// - Auto-resize the  columns of the spreadsheet to fit.
 	var requests []*sheets.Request

@@ -6,36 +6,49 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-type GoogleSheet struct {
+// Spreadsheet represents a Google Spreadsheet, which can contain multiple
+// sheets, each with structured information contained in cells.  A Spreadsheet
+// has a unique spreadsheetID value, which can be found in a Google Sheets URL.
+// See https://developers.google.com/sheets/api/guides/concepts for more
+// information.
+type Spreadsheet struct {
 	id          string
 	spreadsheet *sheets.Spreadsheet
 	service     *sheets.Service
 }
 
-func New(ctx context.Context, credentialsFile, tokenFile, title string) (*GoogleSheet, error) {
-	srv, err := GoogleSheetsService(ctx, credentialsFile, tokenFile)
+// Open opens an exist Spreadsheet.
+func Open(ctx context.Context, credentialsFile, tokenFile, id string) (*Spreadsheet, error) {
+	s, err := newSpreadsheet(ctx, credentialsFile, tokenFile)
+	if err != nil {
+		return nil, err
+	}
+	s.id = id
+	return s, nil
+}
+
+// Create creates a blank spreadsheet.
+func Create(ctx context.Context, credentialsFile, tokenFile, title string) (*Spreadsheet, error) {
+	s, err := newSpreadsheet(ctx, credentialsFile, tokenFile)
 	if err != nil {
 		return nil, err
 	}
 	rowData := make(map[string][]*sheets.RowData)
-	sheet, err := createSheet(ctx, srv, title, rowData)
+	sheet, err := createSheet(ctx, s.service, title, rowData)
 	if err != nil {
 		return nil, err
 	}
-	return &GoogleSheet{
-		id:          sheet.SpreadsheetId,
-		spreadsheet: sheet,
-		service:     srv,
-	}, nil
+	s.id = sheet.SpreadsheetId
+	s.spreadsheet = sheet
+	return s, nil
 }
 
-func Open(ctx context.Context, credentialsFile, tokenFile, id string) (*GoogleSheet, error) {
+func newSpreadsheet(ctx context.Context, credentialsFile, tokenFile string) (*Spreadsheet, error) {
 	srv, err := GoogleSheetsService(ctx, credentialsFile, tokenFile)
 	if err != nil {
 		return nil, err
 	}
-	return &GoogleSheet{
-		id:      id,
+	return &Spreadsheet{
 		service: srv,
 	}, nil
 }

@@ -29,7 +29,7 @@ func GetSpreadsheetID(url string) (string, error) {
 	return spreadsheetID, nil
 }
 
-func (s *GoogleSheet) GetValues(ctx context.Context, readRange string) ([][]interface{}, error) {
+func (s *Spreadsheet) GetValues(ctx context.Context, readRange string) ([][]interface{}, error) {
 	resp, err := s.service.Spreadsheets.Values.Get(s.id, readRange).Do()
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve data from sheet: %v", err)
