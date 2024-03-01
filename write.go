@@ -26,7 +26,7 @@ func (s *GoogleSheet) AppendToSheet(ctx context.Context, rowData map[string][]*s
 			},
 		})
 	}
-	response, err := s.service.Spreadsheets.BatchUpdate(s.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+	response, err := s.service.Spreadsheets.BatchUpdate(s.id, &sheets.BatchUpdateSpreadsheetRequest{
 		IncludeSpreadsheetInResponse: true,
 		Requests:                     createRequests,
 	}).Context(ctx).Do()
@@ -44,7 +44,7 @@ func (s *GoogleSheet) AppendToSheet(ctx context.Context, rowData map[string][]*s
 			},
 		})
 	}
-	response, err = s.service.Spreadsheets.BatchUpdate(s.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+	response, err = s.service.Spreadsheets.BatchUpdate(s.id, &sheets.BatchUpdateSpreadsheetRequest{
 		IncludeSpreadsheetInResponse: true,
 		Requests:                     dataRequests,
 	}).Context(ctx).Do()
@@ -69,7 +69,7 @@ func (s *GoogleSheet) ResizeColumns(ctx context.Context) error {
 			},
 		})
 	}
-	_, err := s.service.Spreadsheets.BatchUpdate(s.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+	_, err := s.service.Spreadsheets.BatchUpdate(s.id, &sheets.BatchUpdateSpreadsheetRequest{
 		Requests: requests,
 	}).Context(ctx).Do()
 	return err

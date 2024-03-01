@@ -2,7 +2,6 @@ package sheets
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/api/sheets/v4"
 )
@@ -30,19 +29,14 @@ func New(ctx context.Context, credentialsFile, tokenFile, title string) (*Google
 	}, nil
 }
 
-func Open(ctx context.Context, credentialsFile, tokenFile, sheetsID string) (*GoogleSheet, error) {
-	sheetsURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/edit", sheetsID)
+func Open(ctx context.Context, credentialsFile, tokenFile, id string) (*GoogleSheet, error) {
 	srv, err := GoogleSheetsService(ctx, credentialsFile, tokenFile)
 	if err != nil {
 		return nil, err
 	}
-	spreadsheetID, err := GetSpreadsheetID(sheetsURL)
-	if err != nil {
-		return nil, err
-	}
 	return &GoogleSheet{
-		spreadsheetID: spreadsheetID,
-		service:       srv,
+		id:      id,
+		service: srv,
 	}, nil
 }
 
