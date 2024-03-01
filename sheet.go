@@ -27,13 +27,16 @@ func Open(ctx context.Context, credentialsFile, tokenFile, id string) (*Spreadsh
 	return s, nil
 }
 
-// Create creates a blank spreadsheet.
-func Create(ctx context.Context, credentialsFile, tokenFile, title string) (*Spreadsheet, error) {
+// Create creates a spreadsheet with the provided title and data.
+func Create(ctx context.Context, credentialsFile, tokenFile, title string, data map[string][]*Row) (*Spreadsheet, error) {
 	s, err := newSpreadsheet(ctx, credentialsFile, tokenFile)
 	if err != nil {
 		return nil, err
 	}
-	rowData := make(map[string][]*sheets.RowData)
+	rowData, err := convertToRowData(data)
+	if err != nil {
+		return nil, err
+	}
 	sheet, err := createSheet(ctx, s.service, title, rowData)
 	if err != nil {
 		return nil, err
