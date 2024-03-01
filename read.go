@@ -34,7 +34,7 @@ func GetSpreadsheetID(url string) (string, error) {
 func GetValues(ctx context.Context, srv *sheets.Service, spreadsheetId, readRange string) error {
 	resp, err := srv.Spreadsheets.Values.Get(spreadsheetId, readRange).Do()
 	if err != nil {
-		return fmt.Errorf("Unable to retrieve data from sheet: %v", err)
+		return fmt.Errorf("unable to retrieve data from sheet: %v", err)
 	}
 	for _, row := range resp.Values {
 		// Print columns A and E, which correspond to indices 0 and 4.
