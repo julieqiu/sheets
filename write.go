@@ -7,35 +7,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 
 	"google.golang.org/api/sheets/v4"
 )
 
-func CreateSheet(ctx context.Context, srv *sheets.Service, title string, rowData map[string][]*sheets.RowData) (*sheets.Spreadsheet, error) {
-	var newSheets []*sheets.Sheet
-	for title, data := range rowData {
-		newSheets = append(newSheets, &sheets.Sheet{
-			Properties: &sheets.SheetProperties{
-				Title: title,
-				GridProperties: &sheets.GridProperties{
-					FrozenRowCount: 1,
-				},
-			},
-			Data: []*sheets.GridData{{RowData: data}},
-		})
-	}
-	spreadsheet := &sheets.Spreadsheet{
-		Properties: &sheets.SpreadsheetProperties{
-			Title: title,
-		},
-		Sheets: newSheets,
-	}
-	return srv.Spreadsheets.Create(spreadsheet).Context(ctx).Do()
-}
-
-func AppendToSheet(ctx context.Context, srv *sheets.Service, spreadsheetID string, rowData map[string][]*sheets.RowData) (*sheets.Spreadsheet, error) {
+func (s *GoogleSheet) AppendToSheet(ctx context.Context, rowData map[string][]*sheets.RowData) error {
 	// First, create the new sheets in spreadsheet.
 	var createRequests []*sheets.Request
 	for title := range rowData {
@@ -50,12 +26,12 @@ func AppendToSheet(ctx context.Context, srv *sheets.Service, spreadsheetID strin
 			},
 		})
 	}
-	response, err := srv.Spreadsheets.BatchUpdate(spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+	response, err := s.service.Spreadsheets.BatchUpdate(s.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
 		IncludeSpreadsheetInResponse: true,
 		Requests:                     createRequests,
 	}).Context(ctx).Do()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Now, add the data to the spreadsheets.
 	var dataRequests []*sheets.Request
@@ -68,21 +44,22 @@ func AppendToSheet(ctx context.Context, srv *sheets.Service, spreadsheetID strin
 			},
 		})
 	}
-	response, err = srv.Spreadsheets.BatchUpdate(spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
+	response, err = s.service.Spreadsheets.BatchUpdate(s.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
 		IncludeSpreadsheetInResponse: true,
 		Requests:                     dataRequests,
 	}).Context(ctx).Do()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return response.UpdatedSpreadsheet, nil
+	s.spreadsheet = response.UpdatedSpreadsheet
+	return nil
 }
 
-func ResizeColumns(ctx context.Context, srv *sheets.Service, spreadsheet *sheets.Spreadsheet) error {
+func (s *GoogleSheet) ResizeColumns(ctx context.Context) error {
 	// Final sheet updates:
 	// - Auto-resize the  columns of the spreadsheet to fit.
 	var requests []*sheets.Request
-	for _, sheet := range spreadsheet.Sheets {
+	for _, sheet := range s.spreadsheet.Sheets {
 		requests = append(requests, &sheets.Request{
 			AutoResizeDimensions: &sheets.AutoResizeDimensionsRequest{
 				Dimensions: &sheets.DimensionRange{
@@ -92,36 +69,14 @@ func ResizeColumns(ctx context.Context, srv *sheets.Service, spreadsheet *sheets
 			},
 		})
 	}
-	_, err := srv.Spreadsheets.BatchUpdate(spreadsheet.SpreadsheetId, &sheets.BatchUpdateSpreadsheetRequest{
+	_, err := s.service.Spreadsheets.BatchUpdate(s.spreadsheetID, &sheets.BatchUpdateSpreadsheetRequest{
 		Requests: requests,
 	}).Context(ctx).Do()
 	return err
 }
 
-// Return the Google Sheets spreadsheet ID for the given URL. If the URL is an
-// invalid format, an error will be returned.
-func GetSpreadsheetID(url string) (string, error) {
-	var spreadsheetID string
-	// Trim the extra pieces that the URL may contain.
-	trimmed := strings.TrimPrefix(url, "https://docs.google.com")
-	trimmed = strings.TrimSuffix(trimmed, "edit#gid=0")
-
-	// Source: https://developers.google.com/sheets/api/guides/concepts.
-	re, err := regexp.Compile("/spreadsheets/d/(?P<ID>([a-zA-Z0-9-_]+))")
-	if err != nil {
-		return "", err
-	}
-	match := re.FindStringSubmatch(trimmed)
-	for i, name := range re.SubexpNames() {
-		if name == "ID" {
-			spreadsheetID = match[i]
-		}
-	}
-	return spreadsheetID, nil
-}
-
-// Write populates the given rowData with the given data.
-func Write(_ context.Context, outputDir string, data map[string][]*Row, rowData map[string][]*sheets.RowData) error {
+// ConvertCells populates the given rowData with the given data.
+func ConvertCells(_ context.Context, outputDir string, data map[string][]*Row, rowData map[string][]*sheets.RowData) error {
 	// Write output to disk first.
 	var filenames []string
 	for filename, cells := range data {

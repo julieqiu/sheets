@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 )
 
 func GoogleSheetsService(ctx context.Context, credentialsFile, tokenFile string) (*sheets.Service, error) {
 	// Read the user's credentials file.
-	b, err := ioutil.ReadFile(credentialsFile)
+	b, err := os.ReadFile(credentialsFile)
 	if err != nil {
 		return nil, err
 	}
@@ -24,52 +25,61 @@ func GoogleSheetsService(ctx context.Context, credentialsFile, tokenFile string)
 	if err != nil {
 		return nil, err
 	}
-	tok, err := getOauthToken(ctx, tokenFile, config)
-	if err != nil {
-		return nil, err
-	}
-	return sheets.New(config.Client(ctx, tok))
+	client := getClient(config)
+	return sheets.NewService(ctx, option.WithHTTPClient(client))
 }
 
-func getOauthToken(ctx context.Context, tokenFile string, config *oauth2.Config) (*oauth2.Token, error) {
-	// token.json stores the user's access and refresh tokens, and is created
-	// automatically when the authorization flow completes for the first time.
-	f, err := os.Open(tokenFile)
-	if err == nil {
-		defer f.Close()
-		tok := &oauth2.Token{}
-		if err := json.NewDecoder(f).Decode(tok); err != nil {
-			return nil, err
-		}
-		return tok, nil
-	}
-	if !os.IsNotExist(err) {
-		return nil, err
-	}
-	// If the token file isn't available, create one.
-	// Request a token from the web, then returns the retrieved token.
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	log.Printf("Go to the following link in your browser then type the "+
-		"authorization code: \n%v\n", authURL)
-
-	var authCode string
-	if _, err := fmt.Scan(&authCode); err != nil {
-		return nil, err
-	}
-	tok, err := config.Exchange(ctx, authCode)
+// Retrieve a token, saves the token, then returns the generated client.
+func getClient(config *oauth2.Config) *http.Client {
+	// The file token.json stores the user's access and refresh tokens, and is
+	// created automatically when the authorization flow completes for the first
+	// time.
+	tokFile := "token.json"
+	tok, err := tokenFromFile(tokFile)
 	if err != nil {
-		return nil, err
+		tok = getTokenFromWeb(config)
+		saveToken(tokFile, tok)
 	}
-	// Save the token for future use.
-	log.Printf("Saving credential file to: %s\n", tokenFile)
-	f, err = os.OpenFile(tokenFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	return config.Client(context.Background(), tok)
+}
+
+// Retrieves a token from a local file.
+func tokenFromFile(file string) (*oauth2.Token, error) {
+	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
+	tok := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(tok)
+	return tok, err
+}
 
-	if err := json.NewEncoder(f).Encode(tok); err != nil {
-		return nil, err
+// Request a token from the web, then returns the retrieved token.
+func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("Go to the following link in your browser then type the "+
+		"authorization code: \n%v\n", authURL)
+
+	var authCode string
+	if _, err := fmt.Scan(&authCode); err != nil {
+		log.Fatalf("Unable to read authorization code: %v", err)
 	}
-	return tok, nil
+
+	tok, err := config.Exchange(context.TODO(), authCode)
+	if err != nil {
+		log.Fatalf("Unable to retrieve token from web: %v", err)
+	}
+	return tok
+}
+
+// Saves a token to a file path.
+func saveToken(path string, token *oauth2.Token) {
+	fmt.Printf("Saving credential file to: %s\n", path)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Fatalf("Unable to cache oauth token: %v", err)
+	}
+	defer f.Close()
+	json.NewEncoder(f).Encode(token)
 }
