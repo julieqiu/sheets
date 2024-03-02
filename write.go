@@ -11,7 +11,7 @@ import (
 	"google.golang.org/api/sheets/v4"
 )
 
-func (s *Spreadsheet) AppendToSheet(ctx context.Context, data map[string][]*Row) error {
+func (s *Spreadsheet) Append(ctx context.Context, data map[string][]*Row) error {
 	rowData, err := convertToRowData(data)
 	if err != nil {
 		return err
